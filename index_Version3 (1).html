@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Печать QR-кода из буфера обмена</title>
+  <style>
+    body { font-family: sans-serif; padding: 2em; background: #fafbfc; }
+    #preview { margin: 1em 0; min-height: 100px; display: flex; align-items: center; justify-content: center; }
+    #printBtn { display: none; margin-top: 1em; padding: 0.5em 2em; font-size: 1.1em; }
+    #info { color: #444; margin-bottom: 1em; }
+    .img-preview { border: 2px solid #e1e4e8; background: #fff; max-width: 320px; max-height: 320px; }
+  </style>
+  <!-- pica.js для качественного масштабирования -->
+  <script src="https://unpkg.com/pica/dist/pica.min.js"></script>
+</head>
+<body>
+  <h1>Печать QR-кода из буфера обмена</h1>
+  <div id="info">
+    1. Скопируйте изображение QR-кода (например, в проводнике или графическом редакторе).<br>
+    2. Вставьте его сюда (Ctrl+V).<br>
+    3. Нажмите "Печать".
+  </div>
+  <div id="preview"></div>
+  <button id="printBtn">Печать</button>
+
+  <script>
+    const preview = document.getElementById('preview');
+    const printBtn = document.getElementById('printBtn');
+    let scaledImg = null;
+
+    // Обработка вставки изображения
+    document.addEventListener('paste', async (event) => {
+      const items = event.clipboardData.items;
+      for (let item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          const img = new Image();
+          img.onload = async function () {
+            // Создаём canvas для масштабирования
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * 0.35);
+            canvas.height = Math.round(img.height * 0.35);
+
+            // Используем pica для качественного уменьшения
+            await window.pica().resize(img, canvas, {
+              quality: 3,
+              alpha: false,
+              unsharpAmount: 120,
+              unsharpRadius: 0.6,
+              unsharpThreshold: 2
+            });
+
+            // Показываем уменьшенное изображение
+            preview.innerHTML = '';
+            scaledImg = new Image();
+            scaledImg.src = canvas.toDataURL('image/png');
+            scaledImg.className = 'img-preview';
+            preview.appendChild(scaledImg);
+
+            printBtn.style.display = 'inline-block';
+          };
+          img.src = URL.createObjectURL(file);
+          break;
+        }
+      }
+    });
+
+    // Печать изображения
+    printBtn.onclick = function () {
+      if (!scaledImg) return;
+      const w = window.open('', '_blank');
+      w.document.write(`
+        <html>
+        <head>
+          <title>Печать QR-кода</title>
+          <style>
+            body { margin:0; display:flex; justify-content:center; align-items:center; height:100vh; }
+            img { max-width:100%; max-height:100%; }
+          </style>
+        </head>
+        <body>
+          <img src="${scaledImg.src}" />
+        </body>
+        </html>
+      `);
+      w.document.close();
+      w.focus();
+      w.print();
+    };
+  </script>
+</body>
+</html>
